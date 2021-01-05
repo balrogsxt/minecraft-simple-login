@@ -1,0 +1,12 @@
+{
+    "meta": {
+        "serverName": "xxxx",
+        "implementationName": "yggdrasil api",
+        "implementationVersion": "1.0.0",
+        "links": {
+            "homepage":"",
+            "register": "http://xxx.com"
+        }
+    },
+    "feature.non_email_login": true
+}
