@@ -47,7 +47,6 @@ func Login(c *gin.Context) {
 	var saveToken jwt.MapClaims
 	offinePlayer := app.Player{}
 	has, err := app.GetDb().Where("email = ?", json.Username).Get(&offinePlayer)
-	fmt.Println(err)
 	if has {
 		//1.离线登录
 		md5Pwd := utils.Md5String(json.Password)
@@ -96,7 +95,8 @@ func Login(c *gin.Context) {
 		}
 	}
 	saveToken["clientToken"] = json.ClientToken
-	saveToken["timeout"] = time.Now().Unix() + 86400*30 //30天有效jwt token
+	saveToken["timeout"] = fmt.Sprintf("%v", time.Now().Unix()+86400*30) //30天有效jwt token
+
 	accessToken, err := utils.JwtBuild(saveToken)
 	if err != nil {
 		logger.Warning("创建jwt令牌失败: %s", err.Error())
@@ -156,7 +156,7 @@ func Join(c *gin.Context) {
 	}
 	//10秒内有效信息
 	field := fmt.Sprintf("joinServer:%s", utils.Md5String(name+json.ServerId))
-	if err := app.GetRedis().Set(field, utils.JsonEncode(serverInfo), time.Second*10); err != nil {
+	if err := app.GetRedis().Set(field, utils.JsonEncode(serverInfo)); err != nil {
 		app.ThrowYggdrasilException("加入失败", "&c加入失败,请重试!")
 	}
 	c.JSON(204, gin.H{})
@@ -212,11 +212,11 @@ func Validate(c *gin.Context) {
 		}
 	} else {
 		//离线
-		timeout, er := strconv.ParseInt(fmt.Sprintf("%d", tokenMap["timeout"]), 10, 64)
+		timeout, er := strconv.ParseInt(fmt.Sprintf("%s", tokenMap["timeout"]), 10, 64)
 		if er != nil {
-			app.ThrowYggdrasilException("ForbiddenOperationException", "数据错误,请尝试重新登录账号")
+			app.ThrowYggdrasilException("ForbiddenOperationException", "数据错误,请尝试重新登录账号:"+er.Error())
 		}
-		if timeout >= time.Now().Unix() {
+		if time.Now().Unix() > timeout {
 			app.ThrowYggdrasilException("ForbiddenOperationException", "账号登录已过期,请尝试重新登录账号")
 		}
 
@@ -240,7 +240,6 @@ func Refresh(c *gin.Context) {
 	if err := c.ShouldBind(&json); err != nil {
 		app.ThrowYggdrasilException("ForbiddenOperationException", "参数错误")
 	}
-	fmt.Println(utils.JsonEncode(json))
 	//验证玩家uuid是否对应token即可允许加入
 	tokenMap, err := utils.JwtParse(json.AccessToken)
 	if err != nil {
@@ -268,7 +267,6 @@ func Refresh(c *gin.Context) {
 		//离线需要查询角色信息
 		offinePlayer := app.Player{}
 		has, _ := app.GetDb().Where("`uuid` = ?", uuid).Get(&offinePlayer)
-		fmt.Println(uuid)
 		if !has {
 			app.ThrowYggdrasilException("ForbiddenOperationException", "账户数据错误,请尝试重新登录账号")
 		}
@@ -277,11 +275,15 @@ func Refresh(c *gin.Context) {
 			app.ThrowYggdrasilException("ForbiddenOperationException", "账户可能已被更改,请尝试重新登录账号")
 		}
 
-		timeout, er := strconv.ParseInt(fmt.Sprintf("%d", tokenMap["timeout"]), 10, 64)
+		timeout, er := strconv.ParseInt(fmt.Sprintf("%s", tokenMap["timeout"]), 10, 64)
 		if er != nil {
-			app.ThrowYggdrasilException("ForbiddenOperationException", "数据错误,请尝试重新登录账号")
+			app.ThrowYggdrasilException("ForbiddenOperationException", "数据错误,请尝试重新登录账号:"+er.Error())
 		}
-		if timeout >= time.Now().Unix()+86400*7 { //登录过期超过7天,进入永久失效状态
+
+		if time.Now().Unix() > timeout {
+			app.ThrowYggdrasilException("ForbiddenOperationException", "1账号登录已过期,请尝试重新登录账号")
+		}
+		if time.Now().Unix()+86400*7 > timeout { //登录过期超过7天,进入永久失效状态
 			app.ThrowYggdrasilException("ForbiddenOperationException", "登录信息已永久过期,请尝试重新登录账号")
 		}
 
@@ -313,7 +315,7 @@ func Refresh(c *gin.Context) {
 		}
 	}
 	saveToken["clientToken"] = json.ClientToken
-	saveToken["timeout"] = time.Now().Unix() + 86400*30 //30天有效jwt token
+	saveToken["timeout"] = fmt.Sprintf("%v", time.Now().Unix()+86400*30) //30天有效jwt token
 	accessToken, er := utils.JwtBuild(saveToken)
 	if er != nil {
 		app.ThrowYggdrasilException("ForbiddenOperationException", "获取登录数据失败,请尝试重新登录账号")
@@ -339,13 +341,20 @@ func GetSkin(c *gin.Context) {
 			return
 		}
 		config := app.GetConfig()
+		_ = config
+		skinUrl := fmt.Sprintf("%s%s", config.SkinUrl, offinePlayer.Skin)
+
 		skinJson := utils.JsonEncode(gin.H{
-			"timestamp":   time.Now().Unix(),
+			"timestamp":   time.Now().Unix() - 86400,
 			"profileId":   offinePlayer.Uuid,
 			"profileName": offinePlayer.Name,
+			"isPublic":    true,
 			"textures": gin.H{
 				"SKIN": gin.H{
-					"url": fmt.Sprintf("%s%s", config.SkinUrl, offinePlayer.Skin),
+					"url": skinUrl,
+					"metadata": gin.H{
+						"model": "slim",
+					},
 				},
 			},
 		})

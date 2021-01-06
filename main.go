@@ -29,9 +29,9 @@ func main() {
 		logger.Info("Redis连接成功")
 	}
 
-	r := gin.New()
-	gin.SetMode(gin.ReleaseMode)
-	//r := gin.Default()
+	//r := gin.New()
+	//gin.SetMode(gin.ReleaseMode)
+	r := gin.Default()
 	r.Use(tryCatch())
 	r.Use(CorsAllow())
 	//离线玩家注册、设置、皮肤等

@@ -176,7 +176,6 @@ func OffineUploadSkin(c *gin.Context) {
 		app.ThrowHttpException("更新皮肤失败,系统错误")
 	} else {
 		//删除旧皮肤
-		fmt.Println(offinePlayer.Skin)
 		if len(offinePlayer.Skin) > 0 {
 			oldSkin := fmt.Sprintf("%s%s", config.SkinDir, offinePlayer.Skin)
 			if err := os.Remove(oldSkin); err != nil {
